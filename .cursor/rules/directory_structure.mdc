@@ -1,0 +1,60 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Step-Audio 目录结构
+
+## 核心目录
+
+### 模型目录
+- 外部挂载路径: `/mnt/data3/AI_models/step_audio/`
+- 容器内路径: `/app/models/`
+- 子目录结构:
+  - `/app/models/tokenizer` - 分词器模型
+  - `/app/models/tts` - 语音合成模型
+  - `/app/models/llm` - 大语言模型
+
+### 数据目录
+- 外部挂载路径: `/mnt/data3/app_data/xiaoq_dh/step_audio`
+- 容器内路径: `/app/data/`
+- 子目录结构:
+  - `/app/data/output` - 生成的音频输出
+  - `/app/data/cache` - 缓存文件
+
+### 日志目录
+- 容器内路径: `/app/logs/`
+- 用途: 存储应用运行日志
+
+## 代码结构
+
+### 核心脚本
+- [app.py](mdc:app.py) - 聊天服务主入口
+- [tts_app.py](mdc:tts_app.py) - TTS服务主入口
+- [start_server.py](mdc:start_server.py) - 统一启动脚本
+
+### 功能模块
+- [stepaudio.py](mdc:stepaudio.py) - 核心音频处理
+- [tts.py](mdc:tts.py) - TTS引擎实现
+- [tokenizer.py](mdc:tokenizer.py) - 分词器实现
+- [utils.py](mdc:utils.py) - 通用工具函数
+
+### Docker相关
+- [Dockerfile](mdc:Dockerfile) - 主Docker配置
+- [Dockerfile-vllm](mdc:Dockerfile-vllm) - VLLM加速Docker配置
+
+## 多GPU配置
+
+Step-Audio支持多GPU并行运行，可以通过以下方式配置：
+
+1. 通过启动脚本指定：
+   ```bash
+   python start_server.py --gpu-ids 0,1,2 --device-map balanced
+   ```
+
+2. 通过环境变量指定：
+   ```bash
+   GPU_IDS=0,1,2 DEVICE_MAP=balanced python start_server.py
+   ```
+
+核心服务（聊天和TTS）可以分布在不同的GPU上，实现资源的高效利用。

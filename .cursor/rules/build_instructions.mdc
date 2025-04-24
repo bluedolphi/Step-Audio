@@ -1,0 +1,126 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Step-Audio 构建指令
+
+## 前提条件
+
+确保系统安装了以下组件：
+- NVIDIA驱动（支持CUDA 11.8+）
+- Docker 和 NVIDIA Container Toolkit
+- 足够的磁盘空间（至少100GB用于模型和数据）
+
+## 构建步骤
+
+### 1. 准备目录结构
+
+首先确保挂载目录已创建：
+
+```bash
+# 创建模型目录
+mkdir -p /mnt/data3/AI_models/step_audio/tokenizer
+mkdir -p /mnt/data3/AI_models/step_audio/tts
+mkdir -p /mnt/data3/AI_models/step_audio/llm
+
+# 创建数据目录
+mkdir -p /mnt/data3/app_data/xiaoq_dh/step_audio/output
+mkdir -p /mnt/data3/app_data/xiaoq_dh/step_audio/cache
+```
+
+### 2. 构建Docker镜像
+
+在项目根目录下执行：
+
+```bash
+# 基础版本
+docker build -t step-audio:latest .
+
+# 如果需要VLLM加速
+docker build -f Dockerfile-vllm -t step-audio:vllm .
+```
+
+### 3. 运行容器
+
+#### 单GPU运行
+
+```bash
+docker run -d \
+  --gpus '"device=0"' \
+  --name step-audio-single \
+  -p 7860:7860 \
+  -p 7861:7861 \
+  -v /mnt/data3/AI_models/step_audio/:/app/models \
+  -v /mnt/data3/app_data/xiaoq_dh/step_audio:/app/data \
+  step-audio:latest
+```
+
+#### 多GPU运行
+
+```bash
+docker run -d \
+  --gpus all \
+  --name step-audio-multi \
+  -p 7860:7860 \
+  -p 7861:7861 \
+  -v /mnt/data3/AI_models/step_audio/:/app/models \
+  -v /mnt/data3/app_data/xiaoq_dh/step_audio:/app/data \
+  -e GPU_IDS=0,1 \
+  -e DEVICE_MAP=balanced \
+  step-audio:latest
+```
+
+### 4. 不使用Docker直接运行
+
+如果希望不使用Docker直接运行，可以执行：
+
+```bash
+# 安装依赖
+pip install -r requirements.txt
+
+# 设置环境变量
+export MODELS_DIR=/mnt/data3/AI_models/step_audio
+export DATA_DIR=/mnt/data3/app_data/xiaoq_dh/step_audio
+export GPU_IDS=0,1
+export DEVICE_MAP=balanced
+
+# 启动服务
+python start_server.py
+```
+
+## 调试与监控
+
+### 查看日志
+
+```bash
+# Docker日志
+docker logs -f step-audio-multi
+
+# 直接运行时的日志
+tail -f /mnt/data3/app_data/xiaoq_dh/step_audio/logs/app.log
+```
+
+### 性能监控
+
+```bash
+# 监控GPU使用
+watch -n 1 nvidia-smi
+
+# 进入容器查看详情
+docker exec -it step-audio-multi bash
+```
+
+## 常见问题解决
+
+1. 如果GPU内存不足，尝试调整加载策略：
+   ```bash
+   # 使用低内存模式
+   docker run ... -e LOW_MEMORY=1 step-audio:latest
+   ```
+
+2. 多GPU负载不均，尝试显式指定设备映射：
+   ```bash
+   # 使用sequential映射
+   docker run ... -e DEVICE_MAP=sequential step-audio:latest
+   ```
