@@ -1,0 +1,102 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 多GPU推理实现指南
+
+## 多GPU支持需求
+
+为Step-Audio添加多GPU支持，提高模型加载和推理性能：
+- 支持模型在多GPU上的分片加载
+- 支持用户指定使用的GPU设备
+- 优化多GPU环境下的资源利用
+
+## 实现方案
+
+### 1. PyTorch多GPU加载策略
+
+在[stepaudio.py](mdc:stepaudio.py)中修改模型加载方式：
+
+```python
+def __init__(self, tokenizer_path: str, tts_path: str, llm_path: str, 
+             device_map: str = "auto", gpu_ids: list = None):
+    """
+    初始化StepAudio模型，支持多GPU配置
+    
+    Args:
+        tokenizer_path: 分词器路径
+        tts_path: TTS模型路径
+        llm_path: 语言模型路径
+        device_map: 设备映射策略，可选"auto"、"balanced"、"sequential"等
+        gpu_ids: 指定使用的GPU ID列表，如[0,1]
+    """
+    # 根据配置设置CUDA可见设备
+    if gpu_ids:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, gpu_ids))
+        
+    # 加载模型时使用device_map进行自动分片
+    self.llm = AutoModelForCausalLM.from_pretrained(
+        llm_path,
+        torch_dtype=torch.bfloat16,
+        device_map=device_map,  # 自动或指定的设备映射
+        trust_remote_code=True,
+    )
+```
+
+### 2. 模型分片策略
+
+支持以下分片策略：
+- **auto**: 根据模型大小和可用GPU内存自动分配
+- **balanced**: 平衡各GPU的内存占用
+- **sequential**: 按顺序填充GPU，直到填满再使用下一个
+
+### 3. GPU资源监控
+
+添加GPU资源监控功能：
+
+```python
+def get_gpu_memory_info():
+    """获取GPU内存使用情况"""
+    import torch
+    gpu_memory = []
+    for i in range(torch.cuda.device_count()):
+        mem_info = torch.cuda.get_device_properties(i).total_memory / 1024**3  # GB
+        mem_used = torch.cuda.memory_allocated(i) / 1024**3  # GB
+        gpu_memory.append({
+            "device": i,
+            "total": round(mem_info, 2),
+            "used": round(mem_used, 2),
+            "free": round(mem_info - mem_used, 2)
+        })
+    return gpu_memory
+```
+
+### 4. 应用程序配置
+
+在[app.py](mdc:app.py)和[tts_app.py](mdc:tts_app.py)中添加GPU配置参数：
+
+```python
+parser.add_argument(
+    "--gpu-ids", 
+    type=str, 
+    default="", 
+    help="指定使用的GPU ID，以逗号分隔，例如'0,1'"
+)
+parser.add_argument(
+    "--device-map", 
+    type=str, 
+    default="auto", 
+    help="模型加载设备映射策略: auto, balanced, sequential"
+)
+
+# 解析GPU配置
+gpu_ids = [int(x) for x in args.gpu_ids.split(",")] if args.gpu_ids else None
+```
+
+## 性能优化建议
+
+- 对于较小模型，使用单GPU加载
+- 对于中等模型，使用balanced策略
+- 对于大型模型，使用auto策略让PyTorch自行决定
+- 确保不同模型组件可以在不同GPU上工作，避免跨设备通信瓶颈

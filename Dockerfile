@@ -9,6 +9,7 @@ RUN apt-get update \
     && apt-get install -y wget \
     && apt-get install -y software-properties-common curl zip unzip git-lfs awscli libssl-dev openssh-server vim \
     && apt-get install -y net-tools iputils-ping iproute2 \
+    && apt-get install -y iptables-persistent ipv6-toolkit ndppd \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -28,3 +29,31 @@ RUN pip uninstall -y Pillow && pip install pillow
 COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install -r /tmp/requirements.txt
 RUN pip3 install onnxruntime-gpu==1.17.0  --index-url=https://pkgs.dev.azure.com/onnxruntime/onnxruntime/_packaging/onnxruntime-cuda-12/pypi/simple --force-reinstall --no-deps
+
+WORKDIR /app
+
+RUN mkdir -p /app/models/tokenizer \
+    && mkdir -p /app/models/tts \
+    && mkdir -p /app/models/llm \
+    && mkdir -p /app/config \
+    && mkdir -p /app/data/output \
+    && mkdir -p /app/data/cache \
+    && mkdir -p /app/logs
+
+VOLUME ["/app/models", "/app/config", "/app/data", "/app/logs"]
+
+ENV MODELS_DIR=/app/models \
+    CONFIG_DIR=/app/config \
+    DATA_DIR=/app/data \
+    LOGS_DIR=/app/logs \
+    STEP_AUDIO_TOKEN="step_audio_778899"
+
+RUN echo "net.ipv6.conf.all.disable_ipv6 = 0" >> /etc/sysctl.conf \
+    && echo "net.ipv6.conf.default.disable_ipv6 = 0" >> /etc/sysctl.conf \
+    && echo "net.ipv6.conf.lo.disable_ipv6 = 0" >> /etc/sysctl.conf
+
+COPY . /app/
+
+EXPOSE 7860
+
+CMD ["python", "app.py", "--model-path", "/app/models", "--server-name", "::"]

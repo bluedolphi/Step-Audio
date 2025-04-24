@@ -1,0 +1,30 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Step-Audio 项目概览
+
+Step-Audio 是一个语音合成和交互系统，支持多种语音功能，包括文本转语音、语音聊天和语音克隆等功能。
+
+## 主要文件和组件
+
+- [app.py](mdc:app.py)：主要的聊天应用入口，基于Gradio构建的语音交互界面
+- [tts_app.py](mdc:tts_app.py)：语音合成应用入口，支持普通合成、RAP/哼唱和语音克隆
+- [stepaudio.py](mdc:stepaudio.py)：Step-Audio核心类，整合了编码器、解码器和语言模型
+- [tts.py](mdc:tts.py)：语音合成引擎实现
+- [tokenizer.py](mdc:tokenizer.py)：文本和语音的tokenizer实现
+- [utils.py](mdc:utils.py)：工具函数集合
+- [Dockerfile](mdc:Dockerfile)：Docker构建文件，基于CUDA环境
+
+## 开发计划
+
+项目有以下主要开发任务：
+
+1. 更新Dockerfile以支持IPv6
+2. 实现Token认证机制
+3. 开发程序状态检查接口
+4. 支持多显卡推理
+5. 配置Docker卷挂载支持
+
+详细计划见[开发任务列表](mdc:task/mainTask.md)

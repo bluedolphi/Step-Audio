@@ -1,0 +1,51 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Dockerfile 修改指南
+
+## 当前Dockerfile结构
+
+[Dockerfile](mdc:Dockerfile)基于NVIDIA CUDA镜像构建，主要配置包括：
+- 基于nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+- 配置中国时区
+- 安装基础工具包和Python 3.10
+- 安装项目Python依赖
+
+## IPv6支持需求
+
+需要在[Dockerfile](mdc:Dockerfile)中添加以下支持：
+- 确保网络相关包支持IPv6
+- 配置Docker以监听IPv6地址
+- 在网络配置中启用IPv6
+
+### 推荐修改点
+1. 检查并更新网络工具包版本
+2. 添加IPv6配置环境变量
+3. 配置应用监听双栈地址
+
+## 卷挂载配置需求
+
+需要添加以下卷挂载点：
+- 模型数据目录挂载
+- 用户配置文件挂载
+- 临时输出目录挂载
+
+### 推荐修改点
+1. 创建专用数据目录
+2. 在Dockerfile中声明VOLUME指令
+3. 确保应用代码使用环境变量方式读取路径，便于挂载替换
+
+## 构建和运行命令参考
+
+```bash
+# 构建镜像
+docker build -t step-audio:latest -f Dockerfile .
+
+# 运行容器（添加IPv6支持）
+docker run --gpus all --network="host" -p 7860:7860 step-audio:latest
+
+# 运行容器（添加卷挂载）
+docker run --gpus all -v /path/to/models:/app/models -v /path/to/config:/app/config step-audio:latest
+```

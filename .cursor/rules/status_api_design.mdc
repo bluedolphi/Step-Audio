@@ -1,0 +1,208 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 程序状态检查API设计
+
+## API需求
+
+为Step-Audio添加状态检查API，满足以下需求：
+- 提供模型加载状态检查
+- 提供系统健康状态检查
+- 提供GPU资源使用情况检查
+
+## 接口设计
+
+### 1. 健康检查端点
+
+```
+GET /api/health
+```
+
+返回示例：
+```json
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "uptime": 3600
+}
+```
+
+### 2. 模型状态检查端点
+
+```
+GET /api/model/status
+```
+
+返回示例：
+```json
+{
+  "models": {
+    "tokenizer": {
+      "loaded": true,
+      "path": "/path/to/tokenizer",
+      "load_time": "2023-05-01T12:00:00Z"
+    },
+    "tts": {
+      "loaded": true,
+      "path": "/path/to/tts",
+      "load_time": "2023-05-01T12:01:30Z"
+    },
+    "llm": {
+      "loaded": true,
+      "path": "/path/to/llm",
+      "load_time": "2023-05-01T12:03:45Z"
+    }
+  },
+  "ready": true
+}
+```
+
+### 3. GPU资源检查端点
+
+```
+GET /api/resources/gpu
+```
+
+返回示例：
+```json
+{
+  "gpu_count": 2,
+  "gpus": [
+    {
+      "id": 0,
+      "name": "NVIDIA A100",
+      "memory_total": 40.0,
+      "memory_used": 35.2,
+      "memory_free": 4.8,
+      "utilization": 85
+    },
+    {
+      "id": 1,
+      "name": "NVIDIA A100",
+      "memory_total": 40.0,
+      "memory_used": 30.5,
+      "memory_free": 9.5,
+      "utilization": 75
+    }
+  ]
+}
+```
+
+## 实现方案
+
+### 1. 状态跟踪类
+
+在新文件`status_tracker.py`中实现状态跟踪类：
+
+```python
+import time
+from datetime import datetime
+import torch
+import psutil
+
+class StatusTracker:
+    def __init__(self):
+        self.start_time = time.time()
+        self.model_status = {
+            "tokenizer": {"loaded": False, "path": None, "load_time": None},
+            "tts": {"loaded": False, "path": None, "load_time": None},
+            "llm": {"loaded": False, "path": None, "load_time": None}
+        }
+        
+    def update_model_status(self, model_type, loaded=True, path=None):
+        """更新模型加载状态"""
+        self.model_status[model_type] = {
+            "loaded": loaded,
+            "path": path,
+            "load_time": datetime.now().isoformat()
+        }
+        
+    def get_health_info(self):
+        """获取健康状态信息"""
+        return {
+            "status": "ok",
+            "version": "1.0.0",
+            "uptime": int(time.time() - self.start_time)
+        }
+        
+    def get_model_status(self):
+        """获取模型状态信息"""
+        all_loaded = all(m["loaded"] for m in self.model_status.values())
+        return {
+            "models": self.model_status,
+            "ready": all_loaded
+        }
+        
+    def get_gpu_info(self):
+        """获取GPU资源信息"""
+        gpu_count = torch.cuda.device_count()
+        gpus = []
+        
+        for i in range(gpu_count):
+            props = torch.cuda.get_device_properties(i)
+            mem_total = props.total_memory / (1024**3)  # GB
+            mem_used = torch.cuda.memory_allocated(i) / (1024**3)  # GB
+            mem_free = mem_total - mem_used
+            
+            gpus.append({
+                "id": i,
+                "name": props.name,
+                "memory_total": round(mem_total, 2),
+                "memory_used": round(mem_used, 2),
+                "memory_free": round(mem_free, 2),
+                "utilization": round(mem_used / mem_total * 100, 2)
+            })
+            
+        return {
+            "gpu_count": gpu_count,
+            "gpus": gpus
+        }
+```
+
+### 2. API路由实现
+
+在[app.py](mdc:app.py)中添加FastAPI路由：
+
+```python
+from fastapi import FastAPI, HTTPException
+from status_tracker import StatusTracker
+
+# 创建FastAPI应用并集成到Gradio中
+app = FastAPI()
+status_tracker = StatusTracker()
+
+@app.get("/api/health")
+async def health_check():
+    """健康检查接口"""
+    return status_tracker.get_health_info()
+
+@app.get("/api/model/status")
+async def model_status():
+    """模型状态检查接口"""
+    return status_tracker.get_model_status()
+
+@app.get("/api/resources/gpu")
+async def gpu_resources():
+    """GPU资源检查接口"""
+    return status_tracker.get_gpu_info()
+```
+
+### 3. 集成到现有应用
+
+在初始化StepAudio时更新状态：
+
+```python
+# 在加载模型时更新状态
+audio_model = StepAudio(...)
+status_tracker.update_model_status("tokenizer", True, args.model_path)
+status_tracker.update_model_status("tts", True, args.model_path)
+status_tracker.update_model_status("llm", True, args.model_path)
+```
+
+## 测试计划
+
+1. 应用启动前检查API返回未就绪状态
+2. 模型加载完成后检查API返回就绪状态 
+3. 模拟GPU负载测试资源监控准确性

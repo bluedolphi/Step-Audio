@@ -1,0 +1,115 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Docker卷挂载配置指南
+
+## 卷挂载需求
+
+为Step-Audio添加Docker卷挂载支持，实现以下目标：
+- 持久化模型数据，避免每次容器重启需重新下载模型
+- 持久化用户配置，方便修改和保存设置
+- 持久化生成的音频输出，便于用户访问
+- 支持外部模型数据的挂载和使用
+
+## 目录结构设计
+
+推荐的目录结构：
+
+```
+/app/
+  ├── models/          # 模型文件目录（需挂载）
+  │   ├── tokenizer/   # 分词器模型
+  │   ├── tts/         # TTS模型
+  │   └── llm/         # 语言模型
+  ├── config/          # 配置文件目录（需挂载）
+  │   └── config.json  # 应用配置
+  ├── data/            # 数据目录（需挂载）
+  │   ├── output/      # 输出音频保存目录
+  │   └── cache/       # 缓存目录
+  └── logs/            # 日志目录（需挂载）
+```
+
+## Dockerfile修改
+
+在[Dockerfile](mdc:Dockerfile)中添加卷声明：
+
+```dockerfile
+# 创建应用目录
+WORKDIR /app
+
+# 创建所需的目录
+RUN mkdir -p /app/models/tokenizer \
+    && mkdir -p /app/models/tts \
+    && mkdir -p /app/models/llm \
+    && mkdir -p /app/config \
+    && mkdir -p /app/data/output \
+    && mkdir -p /app/data/cache \
+    && mkdir -p /app/logs
+
+# 声明卷挂载点
+VOLUME ["/app/models", "/app/config", "/app/data", "/app/logs"]
+
+# 设置环境变量，方便应用代码使用挂载目录
+ENV MODELS_DIR=/app/models \
+    CONFIG_DIR=/app/config \
+    DATA_DIR=/app/data \
+    LOGS_DIR=/app/logs
+```
+
+## 应用代码修改
+
+修改应用代码以支持卷挂载：
+
+1. 在[app.py](mdc:app.py)和[tts_app.py](mdc:tts_app.py)中使用环境变量读取路径：
+
+```python
+import os
+
+# 使用环境变量或默认值
+MODELS_DIR = os.environ.get("MODELS_DIR", "./models")
+CONFIG_DIR = os.environ.get("CONFIG_DIR", "./config")
+DATA_DIR = os.environ.get("DATA_DIR", "./data")
+LOGS_DIR = os.environ.get("LOGS_DIR", "./logs")
+
+# 确保目录存在
+os.makedirs(os.path.join(DATA_DIR, "output"), exist_ok=True)
+os.makedirs(os.path.join(DATA_DIR, "cache"), exist_ok=True)
+
+# 调整临时缓存目录
+CACHE_DIR = os.path.join(DATA_DIR, "cache")
+```
+
+2. 更新音频保存路径：
+
+```python
+def save_audio(audio_type, audio_data, sr):
+    current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    save_path = os.path.join(DATA_DIR, "output", audio_type, f"{current_time}.wav")
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    torchaudio.save(save_path, audio_data, sr)
+    return save_path
+```
+
+## 运行示例
+
+使用以下命令运行带卷挂载的容器：
+
+```bash
+docker run -d --name step-audio \
+  --gpus all \
+  -p 7860:7860 \
+  -v /host/path/to/models:/app/models \
+  -v /host/path/to/config:/app/config \
+  -v /host/path/to/data:/app/data \
+  -v /host/path/to/logs:/app/logs \
+  step-audio:latest
+```
+
+## 数据持久化建议
+
+1. **模型数据**：预先下载模型文件到主机目录并挂载
+2. **配置文件**：初始使用默认配置，根据需要修改后保存在挂载卷中
+3. **输出数据**：定期清理不需要的输出文件，避免磁盘空间占用过大
+4. **日志管理**：配置日志轮转，防止日志文件过大

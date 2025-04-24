@@ -1,0 +1,35 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Step-Audio 代码结构
+
+## 核心模块
+
+### 应用入口
+- [app.py](mdc:app.py)：聊天应用入口，使用Gradio构建UI，集成ASR和TTS功能
+- [tts_app.py](mdc:tts_app.py)：语音合成应用入口，提供多种TTS功能界面
+
+### 语音处理核心
+- [stepaudio.py](mdc:stepaudio.py)：整合编码器、解码器和LLM的核心类
+- [tts.py](mdc:tts.py)：语音合成(TTS)引擎实现
+- [tts_inference.py](mdc:tts_inference.py)：TTS推理优化实现
+- [tokenizer.py](mdc:tokenizer.py)：文本和语音tokenizer
+
+### 工具与辅助模块
+- [utils.py](mdc:utils.py)：通用工具函数，包括音频处理
+- [offline_inference.py](mdc:offline_inference.py)：离线推理实现
+
+## 模块交互关系
+
+主要数据流：
+1. 用户输入 -> app.py/tts_app.py (UI层)
+2. UI层 -> stepaudio.py (核心处理层)
+3. stepaudio.py 调用 tokenizer.py 和 tts.py (基础功能层)
+4. 结果返回UI层并展示
+
+## 部署文件
+- [Dockerfile](mdc:Dockerfile)：主Docker构建文件
+- [Dockerfile-vllm](mdc:Dockerfile-vllm)：vLLM优化版Docker构建文件
+- [requirements.txt](mdc:requirements.txt)：Python依赖列表

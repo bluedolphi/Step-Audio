@@ -1,0 +1,88 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Token认证实现指南
+
+## 认证需求
+
+为Step-Audio应用添加简单的Token认证机制，以提高安全性：
+- 默认Token为"step_audio_778899"
+- 支持自定义Token配置
+- 所有应用入口点都需添加认证
+
+## 实现方案
+
+### 1. 配置层实现
+
+在入口文件([app.py](mdc:app.py)和[tts_app.py](mdc:tts_app.py))中添加：
+
+```python
+# Token认证配置
+import os
+DEFAULT_TOKEN = "step_audio_778899"
+AUTH_TOKEN = os.environ.get("STEP_AUDIO_TOKEN", DEFAULT_TOKEN)
+```
+
+### 2. UI层实现
+
+在Gradio界面添加密码输入框：
+
+```python
+# 在Gradio界面添加
+auth_token = gr.Textbox(
+    label="Authentication Token",
+    type="password",
+    value="",
+    placeholder="请输入访问令牌"
+)
+```
+
+### 3. 认证逻辑实现
+
+添加验证函数：
+
+```python
+def validate_token(token):
+    """验证用户输入的token是否有效"""
+    if token == AUTH_TOKEN:
+        return True
+    return False
+```
+
+### 4. 接口修改
+
+修改现有接口以支持Token认证：
+
+```python
+def on_submit(chatbot, history, mic, text, token):
+    # 先验证token
+    if not validate_token(token):
+        gr.Warning("认证失败，请输入有效的访问令牌")
+        return chatbot, history, mic, text
+    # 继续原有逻辑
+    ...
+```
+
+### 5. Docker配置
+
+在[Dockerfile](mdc:Dockerfile)中添加环境变量支持：
+
+```dockerfile
+# 添加默认Token配置
+ENV STEP_AUDIO_TOKEN="step_audio_778899"
+```
+
+## 测试计划
+
+1. 使用默认Token测试
+2. 使用自定义Token测试
+3. 使用无效Token测试，验证拒绝服务
+4. 环境变量覆盖测试
+
+## 安全注意事项
+
+- Token应通过HTTPS传输
+- 避免在日志中记录Token
+- 考虑添加请求频率限制

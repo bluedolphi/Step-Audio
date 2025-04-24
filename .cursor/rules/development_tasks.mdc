@@ -1,0 +1,50 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Step-Audio 开发任务
+
+本文件包含Step-Audio项目的开发任务详情，按优先级排序。
+
+## 任务1：更新Dockerfile以支持IPv6
+
+需要修改[Dockerfile](mdc:Dockerfile)配置以支持IPv6网络，包括：
+- 研究Docker IPv6配置最佳实践
+- 修改Dockerfile配置，启用IPv6支持
+- 更新应用代码以监听IPv4和IPv6地址
+- 测试双栈网络连接性
+
+## 任务2：实现Token认证机制
+
+在[app.py](mdc:app.py)和其他入口文件中添加认证机制：
+- 设计Token认证API
+- 实现后端Token验证逻辑
+- 配置Dockerfile环境变量支持
+- 为WebUI界面添加密码输入框
+- 测试默认配置(step_audio_778899)和自定义配置
+
+## 任务3：开发程序状态检查接口
+
+添加健康检查和状态API：
+- 设计状态检查API端点
+- 实现模型加载状态跟踪机制
+- 开发健康检查响应逻辑
+- 编写API文档
+
+## 任务4：支持多显卡推理
+
+修改[stepaudio.py](mdc:stepaudio.py)和相关文件以支持多GPU：
+- 研究PyTorch多GPU加载策略
+- 实现模型分片或并行处理逻辑
+- 开发GPU资源分配机制
+- 添加GPU选择配置参数
+- 性能测试与优化
+
+## 任务5：配置Docker卷挂载支持
+
+更新[Dockerfile](mdc:Dockerfile)添加卷挂载：
+- 确定需要持久化的数据目录
+- 修改Dockerfile添加卷挂载点
+- 更新应用代码以适应外部挂载目录
+- 编写卷挂载使用文档
