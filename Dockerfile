@@ -4,12 +4,14 @@ ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone
 
+# 添加DEBIAN_FRONTEND=noninteractive避免交互式提示
+ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update \
     && apt-get install -y build-essential \
     && apt-get install -y wget \
     && apt-get install -y software-properties-common curl zip unzip git-lfs awscli libssl-dev openssh-server vim \
     && apt-get install -y net-tools iputils-ping iproute2 \
-    && apt-get install -y iptables-persistent ipv6-toolkit ndppd \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
